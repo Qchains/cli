@@ -4,6 +4,7 @@
 //
 // Usage:
 //   PRIVATE_KEY=0x... node deposit.js --amount 1.5 --chain base-sepolia
+//   USDC_KEY=0x...    node deposit.js --amount 1.5 --chain base-sepolia
 //   PRIVATE_KEY=0x... node deposit.js --amount 1.5 --chain base-sepolia --dry-run
 //
 // Notes:
@@ -11,6 +12,8 @@
 //     contract; the deposit credits the SIGNER's unified balance.
 //   - This script verifies the signer's address matches EXPECTED_DEPOSITOR before
 //     broadcasting (so you can confirm you're using the intended wallet).
+//   - Either PRIVATE_KEY or USDC_KEY may be used as the env var name for the key
+//     (PRIVATE_KEY takes precedence if both are set).
 
 import process from "node:process";
 import { parseArgs } from "node:util";
@@ -66,8 +69,9 @@ function parseCliArgs() {
 function printHelp() {
   console.log(`Circle Gateway USDC deposit
 
-Required env:
+Required env (either name works; PRIVATE_KEY wins if both are set):
   PRIVATE_KEY    Hex-encoded private key for the depositor wallet (with 0x prefix).
+  USDC_KEY       Same as PRIVATE_KEY; provided as an alternative name.
 
 Options:
   --amount <USDC>           Amount of USDC to deposit (e.g. 1.5). Required unless --help.
@@ -102,13 +106,22 @@ async function main() {
     process.exit(1);
   }
 
-  const privateKey = process.env.PRIVATE_KEY;
-  if (!privateKey || !/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
+  const rawKey = process.env.PRIVATE_KEY || process.env.USDC_KEY;
+  if (!rawKey) {
     console.error(
-      "Error: PRIVATE_KEY env var must be set to a 0x-prefixed 32-byte hex string."
+      "Error: set PRIVATE_KEY or USDC_KEY to the depositor wallet's private key."
     );
     process.exit(1);
   }
+  // Tolerate keys provided without the 0x prefix (Cursor secret UIs sometimes strip it).
+  const privateKey = rawKey.startsWith("0x") ? rawKey : `0x${rawKey}`;
+  if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
+    console.error(
+      "Error: private key must be a 32-byte hex string (64 hex chars, optionally 0x-prefixed)."
+    );
+    process.exit(1);
+  }
+  const keySource = process.env.PRIVATE_KEY ? "PRIVATE_KEY" : "USDC_KEY";
 
   const config = getChainConfig(args.chain);
   const account = privateKeyToAccount(privateKey);
@@ -118,7 +131,7 @@ async function main() {
     account.address.toLowerCase() !== args.depositor.toLowerCase()
   ) {
     console.error(
-      `Error: PRIVATE_KEY corresponds to ${account.address}, but expected ${args.depositor}.\n` +
+      `Error: ${keySource} corresponds to ${account.address}, but expected ${args.depositor}.\n` +
         "Pass --skip-depositor-check to override, or --depositor to change the expected address."
     );
     process.exit(2);

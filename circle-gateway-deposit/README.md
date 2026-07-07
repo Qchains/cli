@@ -27,7 +27,7 @@ Run the script locally with the wallet's key to perform the deposit.
 cd circle-gateway-deposit
 npm install
 cp .env.example .env
-# edit .env and set PRIVATE_KEY
+# edit .env and set PRIVATE_KEY (or USDC_KEY — both are accepted)
 ```
 
 The private key must derive to
